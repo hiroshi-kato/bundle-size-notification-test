@@ -30,6 +30,31 @@ jobs:
           size=$(du -sh .next/static/chunks | cut -f1)
           echo "size=$size" >> $GITHUB_OUTPUT
 
+      - name: Save bundle size as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle-size
+          path: .next/static/chunks
+
+      - name: Download previous bundle size artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: previous-bundle-size
+          path: .previous_bundle
+
+      - name: Compare bundle sizes
+        id: compare_sizes
+        run: |
+          if [ -d ".previous_bundle" ]; then
+            previous_size_kb=$(du -sk .previous_bundle | cut -f1)
+            current_size_kb=$(du -sk .next/static/chunks | cut -f1)
+            diff=$((current_size_kb - previous_size_kb))
+          else
+            current_size_kb=$(du -sk .next/static/chunks | cut -f1)
+            diff=0
+          fi
+          echo "diff=$diff" >> $GITHUB_OUTPUT
+
       - name: Send notification to Slack
         uses: 8398a7/action-slack@v3
         with:
@@ -39,12 +64,29 @@ jobs:
             {
               "attachments": [
                 {
-                  "fallback": "Build completed and bundle size is ${{ steps.bundle_size.outputs.size }}",
+                  "fallback": "Current bundle size: ${{ steps.bundle_size.outputs.size }}",
                   "color": "good",
-                  "title": "Build completed",
-                  "text": "The application has been built and the bundle size is *${{ steps.bundle_size.outputs.size }}*"
+                  "title": "Current Bundle Size",
+                  "text": "Current bundle size: *${{ steps.bundle_size.outputs.size }}*"
+                },
+                {
+                  "fallback": "Difference in size: ${{ steps.compare_sizes.outputs.diff }} kB",
+                  "color": "good",
+                  "title": "Difference in size",
+                  "text": "Difference in size: *${{ steps.compare_sizes.outputs.diff }}* kB"
                 }
               ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Update previous bundle size artifact
+        run: |
+          rm -rf .previous_bundle
+          mv .next/static/chunks .previous_bundle
+
+      - name: Save previous bundle size as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: previous-bundle-size
+          path: .previous_bundle
