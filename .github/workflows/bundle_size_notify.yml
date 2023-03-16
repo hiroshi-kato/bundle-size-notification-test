@@ -30,45 +30,46 @@ jobs:
           size=$(du -sh .next/static/chunks | cut -f1)
           echo "size=$size" >> $GITHUB_OUTPUT
 
-      - name: Save bundle size as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: bundle-size
-          path: .next/static/chunks
-
-      - name: Check if previous bundle size artifact exists
-        id: check_artifact
+      - name: Get previous bundle size artifact
+        id: get_previous_artifact
         uses: actions/github-script@v6
         with:
           script: |
             const { owner, repo } = context.repo
             const artifacts = await github.rest.actions.listArtifactsForRepo({
               owner,
-              repo
+              repo,
+              per_page: 1,
             })
-            const artifact = artifacts.data.artifacts.find(artifact => artifact.name === 'previous-bundle-size')
-            if (artifact) {
-              return artifact.id
+            const previousBundleSizeArtifact = artifacts.data.artifacts.find(artifact => artifact.name === 'previous-bundle-size')
+            if (previousBundleSizeArtifact) {
+              console.log('Previous bundle size artifact found')
+              return previousBundleSizeArtifact.id
             } else {
+              console.log('No previous bundle size artifact found')
               return ''
             }
 
       - name: Download previous bundle size artifact
-        uses: actions/download-artifact@v3
-        if: steps.check_artifact.outputs.result != ''
-        continue-on-error: true
-        with:
-          name: previous-bundle-size
-          path: .previous_bundle
+        if: steps.get_previous_artifact.outputs.result != ''
+        run: |
+          artifact_id=${{ steps.get_previous_artifact.outputs.result }}
+          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$artifact_id)
+          download_url=$(echo "$response" | jq -r '.archive_download_url')
+          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o previous_bundle.zip "$download_url"
+          unzip previous_bundle.zip -d .previous_bundle
+          rm previous_bundle.zip
 
       - name: Compare bundle sizes
         id: compare_sizes
         run: |
-          if [ -d ".previous_bundle" ]; then
+          if [ -d .previous_bundle ]; then
+            echo "Previous bundle size artifact found"
             previous_size_kb=$(du -sk .previous_bundle | cut -f1)
             current_size_kb=$(du -sk .next/static/chunks | cut -f1)
             diff=$((current_size_kb - previous_size_kb))
           else
+            echo "No previous bundle size artifact found"
             current_size_kb=$(du -sk .next/static/chunks | cut -f1)
             diff=0
           fi
