@@ -28,7 +28,7 @@ jobs:
         id: bundle_size
         run: |
           size=$(du -sh .next/static/chunks | cut -f1)
-          echo "::set-output name=size::$size"
+          echo "{size}={$size}" >> $GITHUB_OUTPUT
 
       - name: Send notification to Slack
         uses: 8398a7/action-slack@v3
