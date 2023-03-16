@@ -36,8 +36,27 @@ jobs:
           name: bundle-size
           path: .next/static/chunks
 
+      - name: Check if previous bundle size artifact exists
+        id: check_artifact
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner,
+              repo
+            })
+            const artifact = artifacts.data.artifacts.find(artifact => artifact.name === 'previous-bundle-size')
+            if (artifact) {
+              return artifact.id
+            } else {
+              return ''
+            }
+
       - name: Download previous bundle size artifact
         uses: actions/download-artifact@v3
+        if: steps.check_artifact.outputs.result != ''
+        continue-on-error: true
         with:
           name: previous-bundle-size
           path: .previous_bundle
