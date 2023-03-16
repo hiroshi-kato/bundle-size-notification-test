@@ -1,0 +1,50 @@
+name: Build and Notify Slack
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and analyze application
+        run: ANALYZE=true npm run build
+
+      - name: Get bundle size
+        id: bundle_size
+        run: |
+          size=$(du -sh .next/static/chunks | cut -f1)
+          echo "::set-output name=size::$size"
+
+      - name: Send notification to Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: repo,message,commit,author,eventName,ref,workflow,job,steps
+          custom_payload: |
+            {
+              "attachments": [
+                {
+                  "fallback": "Build completed and bundle size is ${{ steps.bundle_size.outputs.size }}",
+                  "color": "good",
+                  "title": "Build completed",
+                  "text": "The application has been built and the bundle size is *${{ steps.bundle_size.outputs.size }}*"
+                }
+              ]
+            }
+          env:
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_BOT_TOKEN }}
