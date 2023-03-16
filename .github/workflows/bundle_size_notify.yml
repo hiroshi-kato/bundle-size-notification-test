@@ -28,7 +28,7 @@ jobs:
         id: bundle_size
         run: |
           size=$(du -sh .next/static/chunks | cut -f1)
-          echo "{size}={$size}" >> $GITHUB_OUTPUT
+          echo "size=$size" >> $GITHUB_OUTPUT
 
       - name: Send notification to Slack
         uses: 8398a7/action-slack@v3
@@ -47,4 +47,4 @@ jobs:
               ]
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
